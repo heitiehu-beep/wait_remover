@@ -8,7 +8,10 @@
     "url": "https://github.com/ThelevenFD"
   },
   "license": "MIT",
-
+  "host_application": {
+    "min_version": "0.11.6",
+    "max_version": ""
+  },
   "homepage_url": "https://github.com/ThelevenFD/wait_remover",
   "repository_url": "https://github.com/ThelevenFD/wait_remover",
   "keywords": ["action"],
