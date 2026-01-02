@@ -1,14 +1,31 @@
 from src.plugin_system import register_plugin
 from src.chat.utils.prompt_builder import Prompt
-from src.plugin_system.base.base_plugin import BasePlugin
-from src.plugin_system.base.config_types import ConfigField
+from src.plugin_system import BasePlugin, ConfigField
 from src.common.logger import get_logger
 import asyncio
 
-def init_prompt_():
-    # ReAct 形式的 Planner Prompt
-    Prompt(
-        """
+wait_action_text = """
+wait
+动作描述：
+暂时不再发言，等待指定时间。适用于以下情况：
+- 你已经表达清楚一轮，想给对方留出空间
+- 你感觉对方的话还没说完，或者自己刚刚发了好几条连续消息
+- 你想要等待一定时间来让对方把话说完，或者等待对方反应
+- 你想保持安静，专注"听"而不是马上回复
+请你根据上下文来判断要等待多久，请你灵活判断：
+- 如果你们交流间隔时间很短，聊的很频繁，不宜等待太久
+- 如果你们交流间隔时间很长，聊的很少，可以等待较长时间
+{{
+    "action": "wait",
+    "target_message_id":"想要作为这次等待依据的消息id（通常是对方的最新消息）",
+    "reason":"选择等待的原因"
+}}"""
+
+complete_replace_text = """
+- 多次wait之后，对方迟迟不回复消息才用
+- 如果对方只是短暂不回复，应该使用wait而不是complete_talk"""
+
+brain_planner_prompt_react = """
 {time_block}
 {name_block}
 {chat_context_description}，以下是具体的聊天内容
@@ -29,10 +46,28 @@ reply
     "reason":"回复的原因"
 }}
 
+wait
+动作描述：
+暂时不再发言，等待指定时间。适用于以下情况：
+- 你已经表达清楚一轮，想给对方留出空间
+- 你感觉对方的话还没说完，或者自己刚刚发了好几条连续消息
+- 你想要等待一定时间来让对方把话说完，或者等待对方反应
+- 你想保持安静，专注"听"而不是马上回复
+请你根据上下文来判断要等待多久，请你灵活判断：
+- 如果你们交流间隔时间很短，聊的很频繁，不宜等待太久
+- 如果你们交流间隔时间很长，聊的很少，可以等待较长时间
+{{
+    "action": "wait",
+    "target_message_id":"想要作为这次等待依据的消息id（通常是对方的最新消息）",
+    "reason":"选择等待的原因"
+}}
+
 complete_talk
 动作描述：
 当前聊天暂时结束了，对方离开，没有更多话题了
 你可以使用该动作来暂时休息，等待对方有新发言再继续：
+- 多次wait之后，对方迟迟不回复消息才用
+- 如果对方只是短暂不回复，应该使用wait而不是complete_talk
 - 聊天内容显示当前聊天已经结束或者没有新内容时候，选择complete_talk
 选择此动作后，将不再继续循环思考，直到收到对方的新消息
 {{
@@ -68,12 +103,9 @@ complete_talk
 }}
 ```
 
-""",
-        "brain_planner_prompt_react",
-    )
+"""
 
-    Prompt(
-        """
+brain_action_prompt = """
 {action_name}
 动作描述：{action_description}
 使用条件：
@@ -83,9 +115,12 @@ complete_talk
     "target_message_id":"触发action的消息id",
     "reason":"触发action的原因"
 }}
-""",
-        "brain_action_prompt",
-    )
+"""
+
+def init_prompt_():
+    # ReAct 形式的 Planner Prompt
+    Prompt(brain_planner_prompt_react, "brain_planner_prompt_react")
+    Prompt(brain_action_prompt, "brain_action_prompt")
 
 @register_plugin
 class Plugin(BasePlugin):
@@ -96,8 +131,9 @@ class Plugin(BasePlugin):
     config_file_name = "config.toml"
     config_schema: dict = {
         "plugin": {
-            "config_version": ConfigField(type=str, default="1.0.1", description="配置版本(不要修改 除非你知道自己在干什么)"),
-            "remove_wait_action": ConfigField(type=bool, default=True, description="移除私聊的wait动作"),
+            "config_version": ConfigField(type=str, default="1.0.2", description="配置版本(不要修改 除非你知道自己在干什么)"),
+            "change_wait_action": ConfigField(type=bool, default=True, description="改善wait动作(推荐)"),
+            "remove_wait_action": ConfigField(type=bool, default=False, description="移除私聊的wait动作"),
     }
 }
     def __init__(self, **kwargs):
@@ -105,23 +141,27 @@ class Plugin(BasePlugin):
         global logger
         logger = get_logger(self.plugin_name)
         if self.get_config("plugin.remove_wait_action"):
+            logger.info("启用移除wait动作")
+            asyncio.create_task(self.remove_action())
+        elif self.get_config("plugin.change_wait_action"):
+            logger.info("启用改善wait动作")
+            brain_planner_prompt_react.replace(wait_action_text, "").replace(complete_replace_text, "")
             asyncio.create_task(self.remove_action())
         else:
-            logger.info("未启用移除wait动作")
+            logger.error("未启用任何功能")            
 
     def get_plugin_components(self):
         return []
     
-
-
     async def remove_action(self):
         await asyncio.sleep(5)
         import src.chat.brain_chat.brain_planner
-        logger.info("尝试移除wait动作")
+        logger.info("尝试Patch wait动作")
+
         try:
-            src.chat.brain_chat.brain_planner.init_prompt = init_prompt_()
-            if src.chat.brain_chat.brain_planner.init_prompt is init_prompt_():
-                logger.info("移除wait动作成功")
+            src.chat.brain_chat.brain_planner.init_prompt = init_prompt_
+            if src.chat.brain_chat.brain_planner.init_prompt is init_prompt_:
+                logger.info("patch成功")
         except Exception as e:
-            logger.error(f"移除wait动作失败: {e}")
+            logger.error(f"Patch动作失败: {e}")
         
