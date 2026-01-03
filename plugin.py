@@ -1,13 +1,7 @@
 from src.plugin_system import register_plugin, ConfigField, BasePlugin
 from src.chat.utils.prompt_builder import Prompt, global_prompt_manager
 from src.common.logger import get_logger
-<<<<<<< Updated upstream
-from src.chat.utils.prompt_builder import global_prompt_manager
-import asyncio
-import re
-=======
 import textwrap
->>>>>>> Stashed changes
 
 # --- Prompt Templates (常量区) ---
 
@@ -99,16 +93,6 @@ ACTION_TEMPLATE = """
 }}
 """
 
-<<<<<<< Updated upstream
-def init_prompt_():
-    # ReAct 形式的 Planner Prompt
-    Prompt(brain_planner_prompt_react, "brain_planner_prompt_react")
-    Prompt(brain_action_prompt, "brain_action_prompt")
-
-WAIT_PATTERN = r'wait\s*动作描述：.*?"action": "wait",\s*"target_message_id":.*?"reason":"选择等待的原因"\s*}}'
-
-=======
->>>>>>> Stashed changes
 @register_plugin
 class Plugin(BasePlugin):
     plugin_name = "wait_remover"
@@ -118,49 +102,11 @@ class Plugin(BasePlugin):
     config_file_name = "config.toml"
     config_schema = {
         "plugin": {
-<<<<<<< Updated upstream
-            "config_version": ConfigField(type=str, default="1.0.2", description="配置版本"),
-=======
             "config_version": ConfigField(type=str, default="1.0.2", description="配置版本(不要修改)"),
->>>>>>> Stashed changes
             "change_wait_action": ConfigField(type=bool, default=True, description="改善wait动作(推荐)"),
             "remove_wait_action": ConfigField(type=bool, default=False, description="移除私聊的wait动作"),
         }
     }
-<<<<<<< Updated upstream
-    
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.logger = get_logger(self.plugin_name)
-        self._setup_actions()
-    
-    def _setup_actions(self):
-        """根据配置设置相应的动作"""
-        if self.get_config("plugin.remove_wait_action"):
-            self.logger.info("启用移除wait动作")
-            asyncio.create_task(self._modify_prompt(""))
-        elif self.get_config("plugin.change_wait_action"):
-            self.logger.info("启用改善wait动作")
-            asyncio.create_task(self._modify_prompt(wait_action_text))
-        else:
-            self.logger.error("未启用任何功能")
-    
-    async def _modify_prompt(self, new_wait_text):
-        """修改prompt模板中的wait动作"""
-        await asyncio.sleep(5)
-        
-        try:
-            prompt_template = await global_prompt_manager.get_prompt_async(name="brain_planner_prompt_react")
-            new_prompt = re.sub(WAIT_PATTERN, new_wait_text, prompt_template, flags=re.DOTALL)
-            global_prompt_manager.add_prompt(name="brain_planner_prompt_react", fstr=new_prompt)
-            
-            action = "移除" if not new_wait_text else "修改"
-            self.logger.info(f"成功{action}wait动作")
-            
-        except Exception as e:
-            self.logger.error(f"{action}wait动作失败: {e}")
-    
-=======
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -228,6 +174,5 @@ class Plugin(BasePlugin):
         except Exception as e:
             self.logger.error(f"替换 Planner 动作失败: {e}", exc_info=True)
 
->>>>>>> Stashed changes
     def get_plugin_components(self):
         return []
