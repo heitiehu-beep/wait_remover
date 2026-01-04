@@ -102,7 +102,8 @@ class Plugin(BasePlugin):
     config_file_name = "config.toml"
     config_schema = {
         "plugin": {
-            "config_version": ConfigField(type=str, default="1.0.2", description="配置版本(不要修改)"),
+            "config_version": ConfigField(type=str, default="1.0.3", description="配置版本(不要修改)"),
+            "enabled": ConfigField(type=bool, default=True, description="是否启用插件"),
             "change_wait_action": ConfigField(type=bool, default=True, description="改善wait动作(推荐)"),
             "remove_wait_action": ConfigField(type=bool, default=False, description="移除私聊的wait动作"),
         }
@@ -111,6 +112,13 @@ class Plugin(BasePlugin):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.logger = get_logger(self.plugin_name)
+        
+        # 检查插件是否启用
+        self.enabled = self.get_config("plugin.enabled", True)
+        if not self.enabled:
+            self.logger.info("插件已禁用，不执行 patch_planner")
+            return
+        
         self.is_remove = self.get_config("plugin.remove_wait_action")
         self.is_enhance = self.get_config("plugin.change_wait_action")
         
@@ -121,6 +129,10 @@ class Plugin(BasePlugin):
         """
         直接修改 global_prompt_manager 中的缓存对象，无需 Hook 原函数
         """
+        # 检查插件是否启用
+        if not self.enabled:
+            return
+        
         if not self.is_remove and not self.is_enhance:
             return
         
